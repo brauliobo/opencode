@@ -295,6 +295,7 @@ export const dict = {
   "prompt.menu.commands": "Commands",
   "prompt.menu.context": "Context",
   "prompt.menu.shellCommand": "Shell command",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "Remove attachment",
   "prompt.action.send": "Send",
   "prompt.action.stop": "Stop",

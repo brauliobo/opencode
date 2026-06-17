@@ -47,6 +47,7 @@ import { ModelSelectorPopover, ModelSelectorPopoverV2 } from "@/components/dialo
 import { DialogSelectModelUnpaid } from "@/components/dialog-select-model-unpaid"
 import { DialogSelectModelUnpaidV2 } from "@/components/dialog-select-model-unpaid-v2"
 import { useCommand } from "@/context/command"
+import { useServer } from "@/context/server"
 import { usePermission } from "@/context/permission"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
@@ -82,6 +83,12 @@ import { createPromptInputTransientState } from "./prompt-input/transient-state"
 import { showToast } from "@/utils/toast"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import type { ReferenceInfo } from "@opencode-ai/sdk/v2/client"
+import {
+  appendVoiceTranscript,
+  createVoiceFetch,
+  createVoiceInputController,
+  transcribeVoice,
+} from "@/utils/voice-input"
 
 export { createPromptInputHistory }
 export type { PromptInputControls, PromptInputHistory, PromptInputProps, PromptInputState, PromptInputSubmission }
@@ -127,6 +134,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
   const permission = usePermission()
   const language = useLanguage()
   const platform = usePlatform()
+  const server = useServer()
   const tabs = () => props.controls.session.tabs
   let editorRef!: HTMLDivElement
   let fileInputRef: HTMLInputElement | undefined
@@ -433,6 +441,20 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     })
   }
 
+  const voiceConfig = createMemo(
+    () => (sync().data.config.experimental as { voice?: { enabled?: boolean; whisper_url?: string } } | undefined)?.voice,
+  )
+
+  const insertVoiceTranscript = (text: string) => {
+    const next = appendVoiceTranscript(prompt.current(), text)
+    prompt.set(next.prompt, next.cursor)
+    requestAnimationFrame(() => {
+      editorRef.focus()
+      setCursorPosition(editorRef, next.cursor)
+      queueScroll()
+    })
+  }
+
   const setMode = (mode: "normal" | "shell") => {
     setStore("mode", mode)
     setStore({ popover: null, slashMenu: false, slashMenuQuery: "" })
@@ -541,6 +563,33 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
 
   const [composing, setComposing] = createSignal(false)
   const isImeComposing = (event: KeyboardEvent) => event.isComposing || composing() || event.keyCode === 229
+  const voice = createVoiceInputController({
+    config: voiceConfig,
+    disabled: () => store.mode !== "normal",
+    holdDisabled: () => !!store.popover,
+    isComposing: isImeComposing,
+    transcribe: (audio) =>
+      transcribeVoice({
+        fetch: createVoiceFetch(platform.fetch),
+        serverUrl: sdk().url,
+        directory: sdk().directory,
+        audio,
+        auth: server.current?.http,
+      }),
+    onTranscript: insertVoiceTranscript,
+    onError: (error) =>
+      showToast({
+        variant: "error",
+        title: language.t("common.requestFailed"),
+        description: error instanceof Error ? error.message : String(error),
+      }),
+  })
+  const voiceLabel = createMemo(() =>
+    voice.recording() ? language.t("prompt.action.stop") : language.t("prompt.action.recordVoice"),
+  )
+  const handleVoiceHoldKeyUp = (event: KeyboardEvent) => {
+    voice.handleHoldKeyUp(event, () => addPart({ type: "text", content: " ", start: 0, end: 0 }))
+  }
 
   const handleBlur = () => {
     const cursor = currentCursor()
@@ -1230,6 +1279,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     })
 
   const handleKeyDown = (event: KeyboardEvent) => {
+    if (voice.handleHoldKeyDown(event)) return
+
     if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "u") {
       event.preventDefault()
       if (store.mode !== "normal") return
@@ -1500,7 +1551,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           onMouseDown={(e) => {
             const target = e.target
             if (!(target instanceof HTMLElement)) return
-            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-submit"]')) {
+            if (target.closest('[data-action="prompt-attach"], [data-action="prompt-submit"], [data-action="prompt-voice"]')) {
               return
             }
             editorRef?.focus()
@@ -1531,6 +1582,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
               onFocus={handleFocus}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
+              onKeyUp={handleVoiceHoldKeyUp}
               classList={{
                 "select-text": true,
                 "w-full pl-3 pr-2 pt-2 text-14-regular text-text-strong focus:outline-none whitespace-pre-wrap": true,
@@ -1574,6 +1626,16 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
             />
 
             <div class="flex items-center gap-1 pointer-events-auto">
+              <Show when={voice.available()}>
+                <PromptVoiceButton
+                  label={voiceLabel()}
+                  recording={voice.recording()}
+                  disabled={voice.disabled()}
+                  class="size-8 disabled:opacity-50"
+                  tabIndex={store.mode === "normal" ? undefined : -1}
+                  onClick={() => void voice.toggle()}
+                />
+              </Show>
               <Tooltip placement="top" inactive={!working() && blank()} value={tip()}>
                 <IconButton
                   data-action="prompt-submit"
@@ -1788,5 +1850,30 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
         </DockTray>
       </Show>
     </div>
+  )
+}
+
+function PromptVoiceButton(props: {
+  label: string
+  recording: boolean
+  disabled: boolean
+  class: string
+  tabIndex?: number
+  onClick: () => void
+}) {
+  return (
+    <TooltipV2 placement="top" gutter={4} value={props.label}>
+      <IconButton
+        data-action="prompt-voice"
+        type="button"
+        icon={props.recording ? "stop" : "microphone"}
+        variant={props.recording ? "primary" : "ghost"}
+        class={props.class}
+        onClick={props.onClick}
+        disabled={props.disabled}
+        tabIndex={props.tabIndex}
+        aria-label={props.label}
+      />
+    </TooltipV2>
   )
 }

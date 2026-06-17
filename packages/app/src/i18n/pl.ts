@@ -274,6 +274,7 @@ export const dict = {
   "prompt.menu.commands": "Polecenia",
   "prompt.menu.context": "Kontekst",
   "prompt.menu.shellCommand": "Polecenie powłoki",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "Usuń załącznik",
   "prompt.action.send": "Wyślij",
   "prompt.action.stop": "Zatrzymaj",

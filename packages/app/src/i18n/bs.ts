@@ -293,6 +293,7 @@ export const dict = {
   "prompt.menu.commands": "Komande",
   "prompt.menu.context": "Kontekst",
   "prompt.menu.shellCommand": "Shell naredba",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "Ukloni prilog",
   "prompt.action.send": "Pošalji",
   "prompt.action.stop": "Zaustavi",

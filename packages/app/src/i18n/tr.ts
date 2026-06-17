@@ -297,6 +297,7 @@ export const dict = {
   "prompt.menu.commands": "Komutlar",
   "prompt.menu.context": "Bağlam",
   "prompt.menu.shellCommand": "Kabuk komutu",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "Eki kaldır",
   "prompt.action.send": "Gönder",
   "prompt.action.stop": "Durdur",

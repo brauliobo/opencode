@@ -294,6 +294,7 @@ export const dict = {
   "prompt.menu.commands": "Команди",
   "prompt.menu.context": "Контекст",
   "prompt.menu.shellCommand": "Команда оболонки",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "Видалити вкладення",
   "prompt.action.send": "Надіслати",
   "prompt.action.stop": "Зупинити",

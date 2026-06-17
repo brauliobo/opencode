@@ -292,6 +292,7 @@ export const dict = {
   "prompt.menu.commands": "命令",
   "prompt.menu.context": "上下文",
   "prompt.menu.shellCommand": "shell 命令",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "移除附件",
   "prompt.action.send": "傳送",
   "prompt.action.stop": "停止",

@@ -260,6 +260,7 @@ export const dict = {
   "prompt.menu.commands": "명령어",
   "prompt.menu.context": "컨텍스트",
   "prompt.menu.shellCommand": "셸 명령",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "첨부 파일 제거",
   "prompt.action.send": "전송",
   "prompt.action.stop": "중지",

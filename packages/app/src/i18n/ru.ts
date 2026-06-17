@@ -292,6 +292,7 @@ export const dict = {
   "prompt.menu.commands": "Команды",
   "prompt.menu.context": "Контекст",
   "prompt.menu.shellCommand": "Команда оболочки",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "Удалить вложение",
   "prompt.action.send": "Отправить",
   "prompt.action.stop": "Остановить",

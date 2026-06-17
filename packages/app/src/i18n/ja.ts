@@ -272,6 +272,7 @@ export const dict = {
   "prompt.menu.commands": "コマンド",
   "prompt.menu.context": "コンテキスト",
   "prompt.menu.shellCommand": "シェルコマンド",
+  "prompt.action.recordVoice": "Record voice",
   "prompt.attachment.remove": "添付ファイルを削除",
   "prompt.action.send": "送信",
   "prompt.action.stop": "停止",
