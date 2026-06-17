@@ -1,5 +1,6 @@
 import type { Argv } from "yargs"
 import { Auth } from "../../auth"
+import { AuthWellKnown } from "@opencode-ai/core/auth-well-known"
 import { cmd } from "./cmd"
 import { CliError, effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
@@ -253,6 +254,7 @@ export const ProvidersListCommand = effectCmd({
   instance: false,
   handler: Effect.fn("Cli.providers.list")(function* (_args) {
     const authSvc = yield* Auth.Service
+    const authWellKnown = yield* AuthWellKnown.Service
     const modelsDev = yield* ModelsDev.Service
 
     UI.empty()
@@ -260,11 +262,16 @@ export const ProvidersListCommand = effectCmd({
     const homedir = os.homedir()
     const displayPath = authPath.startsWith(homedir) ? authPath.replace(homedir, "~") : authPath
     yield* Prompt.intro(`Credentials ${UI.Style.TEXT_DIM}${displayPath}`)
-    const results = Object.entries(yield* Effect.orDie(authSvc.all()))
+    const results = [
+      ...Object.entries(yield* Effect.orDie(authSvc.all()))
+        .filter(([, value]) => value.type !== "wellknown")
+        .map(([key, value]) => ({ key, type: value.type })),
+      ...Object.keys(yield* Effect.orDie(authWellKnown.all())).map((key) => ({ key, type: "wellknown" as const })),
+    ]
     const database = yield* modelsDev.get()
 
-    for (const [providerID, result] of results) {
-      const name = database[providerID]?.name || providerID
+    for (const result of results) {
+      const name = database[result.key]?.name || result.key
       yield* Prompt.log.info(`${name} ${UI.Style.TEXT_DIM}${result.type}`)
     }
 
@@ -319,6 +326,7 @@ export const ProvidersLoginCommand = effectCmd({
       }),
   handler: Effect.fn("Cli.providers.login")(function* (args) {
     const authSvc = yield* Auth.Service
+    const authWellKnown = yield* AuthWellKnown.Service
 
     UI.empty()
     yield* Prompt.intro("Add credential")
@@ -345,7 +353,7 @@ export const ProvidersLoginCommand = effectCmd({
         yield* Prompt.outro("Done")
         return
       }
-      yield* Effect.orDie(authSvc.set(url, { type: "wellknown", key: wellknown.auth.env, token: token.trim() }))
+      yield* Effect.orDie(authWellKnown.set(url, new AuthWellKnown.Entry({ key: wellknown.auth.env, token: token.trim() })))
       yield* Prompt.log.success("Logged into " + url)
       yield* Prompt.outro("Done")
       return
@@ -500,19 +508,29 @@ export const ProvidersLogoutCommand = effectCmd({
   instance: false,
   handler: Effect.fn("Cli.providers.logout")(function* (args) {
     const authSvc = yield* Auth.Service
+    const authWellKnown = yield* AuthWellKnown.Service
     const modelsDev = yield* ModelsDev.Service
 
     UI.empty()
-    const credentials: Array<[string, Auth.Info]> = Object.entries(yield* Effect.orDie(authSvc.all()))
+    const credentials = [
+      ...Object.entries(yield* Effect.orDie(authSvc.all()))
+        .filter(([, value]) => value.type !== "wellknown")
+        .map(([key, value]) => ({ key, type: value.type, auth: "provider" as const })),
+      ...Object.keys(yield* Effect.orDie(authWellKnown.all())).map((key) => ({
+        key,
+        type: "wellknown" as const,
+        auth: "wellknown" as const,
+      })),
+    ]
     yield* Prompt.intro("Remove credential")
     if (credentials.length === 0) {
       yield* Prompt.log.error("No credentials found")
       return
     }
     const database = yield* modelsDev.get()
-    const options = credentials.map(([key, value]) => ({
-      label: (database[key]?.name || key) + UI.Style.TEXT_DIM + " (" + value.type + ")",
-      value: key,
+    const options = credentials.map((item) => ({
+      label: (database[item.key]?.name || item.key) + UI.Style.TEXT_DIM + " (" + item.type + ")",
+      value: item.key,
     }))
     const provider = args.provider
       ? options.find(
@@ -528,7 +546,10 @@ export const ProvidersLogoutCommand = effectCmd({
           }),
         )
     if (!provider) return yield* fail(`Unknown configured provider "${args.provider}"`)
-    yield* Effect.orDie(authSvc.remove(provider))
+    const credential = credentials.find((item) => item.key === provider)
+    if (!credential) return yield* fail(`Unknown configured provider "${provider}"`)
+    if (credential.auth === "wellknown") yield* Effect.orDie(authWellKnown.remove(provider))
+    else yield* Effect.orDie(authSvc.remove(provider))
     yield* Prompt.outro("Logout successful")
   }),
 })
